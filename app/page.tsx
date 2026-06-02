@@ -13,7 +13,7 @@ type Phase = 'idle' | 'running' | 'paused' | 'done' | 'stopped';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const FIELDS = ['First Name', 'Last Name', 'Company Name', 'Job Title', 'Seniority', 'Job Function'];
-const DELAY_MS = 6000;
+const DELAY_MS = 2150;
 
 const BADGE: Record<Decision, string> = {
   KEEP:   'bg-green-950 text-green-400 border border-green-900/50',
@@ -26,26 +26,22 @@ const BADGE: Record<Decision, string> = {
 
 function sleep(ms: number) { return new Promise<void>(r => setTimeout(r, ms)); }
 
-async function callGemini(row: Row): Promise<{ decision: Decision; reason: string }> {
+async function callGroq(row: Row): Promise<{ decision: Decision; reason: string }> {
   const contactText = FIELDS
     .filter(f => row[f]?.trim())
     .map(f => `${f}: ${row[f]}`)
     .join('\n');
 
-  const res = await fetch('/api/gemini', {
+  const res = await fetch('/api/groq', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contactText }),
   });
 
   if (!res.ok) {
-    if (res.status === 429) {
-      const data = await res.json().catch(() => ({}));
-      const retryAfterSec = data.retryAfter ? parseFloat(data.retryAfter) : null;
-      throw Object.assign(new Error('rate_limit'), { retryAfterMs: retryAfterSec ? retryAfterSec * 1000 : null });
-    }
+    if (res.status === 429) throw new Error('rate_limit');
     const body = await res.text().catch(() => '');
-    throw new Error(`Gemini ${res.status}: ${body.slice(0, 200)}`);
+    throw new Error(`Groq ${res.status}: ${body.slice(0, 80)}`);
   }
 
   const data = await res.json();
@@ -132,21 +128,20 @@ export default function Home() {
       const row = rows[idx];
       let decision: Decision = 'ERROR';
       let reason = 'Failed';
-      let retries = 5;
-      let backoff = 60000;
+      let retries = 3;
+      let backoff = 30000;
       let scored = false;
 
       while (retries > 0 && !scored) {
         try {
-          const r = await callGemini(row);
+          const r = await callGroq(row);
           decision = r.decision;
           reason   = r.reason;
           scored   = true;
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           if (msg === 'rate_limit') {
-            const retryMs = (err as Error & { retryAfterMs?: number | null }).retryAfterMs;
-            await sleep(retryMs ?? backoff);
+            await sleep(backoff);
             backoff = Math.min(backoff * 2, 120_000);
             retries--;
           } else {
@@ -219,7 +214,7 @@ export default function Home() {
           </div>
           <h1 className="text-3xl font-bold text-white tracking-tight">Contact Scorer</h1>
           <p className="text-gray-400 mt-2 text-sm leading-relaxed max-w-2xl">
-            Upload a 6sense CSV export and score every contact for VXI outreach using Gemini 2.0 Flash.
+            Upload a 6sense CSV export and score every contact for VXI outreach using Groq&apos;s Llama 3.3 70B.
             Each contact is classified as{' '}
             <span className="text-green-400 font-medium">KEEP</span>,{' '}
             <span className="text-red-400 font-medium">DROP</span>, or{' '}
