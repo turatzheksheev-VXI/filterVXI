@@ -13,7 +13,7 @@ type Phase = 'idle' | 'running' | 'paused' | 'done' | 'stopped';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const FIELDS = ['First Name', 'Last Name', 'Company Name', 'Job Title', 'Seniority', 'Job Function'];
-const DELAY_MS = 2150;
+const DELAY_MS = 4500;
 
 const BADGE: Record<Decision, string> = {
   KEEP:   'bg-green-950 text-green-400 border border-green-900/50',
