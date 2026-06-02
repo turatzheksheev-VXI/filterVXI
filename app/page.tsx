@@ -26,13 +26,13 @@ const BADGE: Record<Decision, string> = {
 
 function sleep(ms: number) { return new Promise<void>(r => setTimeout(r, ms)); }
 
-async function callGroq(row: Row): Promise<{ decision: Decision; reason: string }> {
+async function callGemini(row: Row): Promise<{ decision: Decision; reason: string }> {
   const contactText = FIELDS
     .filter(f => row[f]?.trim())
     .map(f => `${f}: ${row[f]}`)
     .join('\n');
 
-  const res = await fetch('/api/groq', {
+  const res = await fetch('/api/gemini', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contactText }),
@@ -41,7 +41,7 @@ async function callGroq(row: Row): Promise<{ decision: Decision; reason: string 
   if (!res.ok) {
     if (res.status === 429) throw new Error('rate_limit');
     const body = await res.text().catch(() => '');
-    throw new Error(`Groq ${res.status}: ${body.slice(0, 80)}`);
+    throw new Error(`Gemini ${res.status}: ${body.slice(0, 80)}`);
   }
 
   const data = await res.json();
@@ -134,7 +134,7 @@ export default function Home() {
 
       while (retries > 0 && !scored) {
         try {
-          const r = await callGroq(row);
+          const r = await callGemini(row);
           decision = r.decision;
           reason   = r.reason;
           scored   = true;
@@ -214,7 +214,7 @@ export default function Home() {
           </div>
           <h1 className="text-3xl font-bold text-white tracking-tight">Contact Scorer</h1>
           <p className="text-gray-400 mt-2 text-sm leading-relaxed max-w-2xl">
-            Upload a 6sense CSV export and score every contact for VXI outreach using Groq&apos;s Llama 3.3 70B.
+            Upload a 6sense CSV export and score every contact for VXI outreach using Gemini 2.0 Flash.
             Each contact is classified as{' '}
             <span className="text-green-400 font-medium">KEEP</span>,{' '}
             <span className="text-red-400 font-medium">DROP</span>, or{' '}
