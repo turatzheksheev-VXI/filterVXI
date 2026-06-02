@@ -51,7 +51,8 @@ export async function POST(req: Request) {
   if (!geminiRes.ok) {
     const status = geminiRes.status;
     const body = await geminiRes.text().catch(() => '');
-    return Response.json({ error: `Gemini ${status}: ${body.slice(0, 80)}`, status }, { status });
+    const retryAfter = geminiRes.headers.get('retry-after') ?? geminiRes.headers.get('x-ratelimit-reset-requests');
+    return Response.json({ error: `Gemini ${status}: ${body.slice(0, 300)}`, status, retryAfter }, { status });
   }
 
   const data = await geminiRes.json();

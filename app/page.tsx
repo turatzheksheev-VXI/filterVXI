@@ -13,7 +13,7 @@ type Phase = 'idle' | 'running' | 'paused' | 'done' | 'stopped';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const FIELDS = ['First Name', 'Last Name', 'Company Name', 'Job Title', 'Seniority', 'Job Function'];
-const DELAY_MS = 4500;
+const DELAY_MS = 6000;
 
 const BADGE: Record<Decision, string> = {
   KEEP:   'bg-green-950 text-green-400 border border-green-900/50',
@@ -39,9 +39,13 @@ async function callGemini(row: Row): Promise<{ decision: Decision; reason: strin
   });
 
   if (!res.ok) {
-    if (res.status === 429) throw new Error('rate_limit');
+    if (res.status === 429) {
+      const data = await res.json().catch(() => ({}));
+      const retryAfterSec = data.retryAfter ? parseFloat(data.retryAfter) : null;
+      throw Object.assign(new Error('rate_limit'), { retryAfterMs: retryAfterSec ? retryAfterSec * 1000 : null });
+    }
     const body = await res.text().catch(() => '');
-    throw new Error(`Gemini ${res.status}: ${body.slice(0, 80)}`);
+    throw new Error(`Gemini ${res.status}: ${body.slice(0, 200)}`);
   }
 
   const data = await res.json();
@@ -128,8 +132,8 @@ export default function Home() {
       const row = rows[idx];
       let decision: Decision = 'ERROR';
       let reason = 'Failed';
-      let retries = 3;
-      let backoff = 30000;
+      let retries = 5;
+      let backoff = 60000;
       let scored = false;
 
       while (retries > 0 && !scored) {
@@ -141,7 +145,8 @@ export default function Home() {
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           if (msg === 'rate_limit') {
-            await sleep(backoff);
+            const retryMs = (err as Error & { retryAfterMs?: number | null }).retryAfterMs;
+            await sleep(retryMs ?? backoff);
             backoff = Math.min(backoff * 2, 120_000);
             retries--;
           } else {
